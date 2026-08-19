@@ -24,8 +24,18 @@ The terminal shares GPIO 8 (SDA) and GPIO 9 (SCL) with onboard devices.
 The current firmware initializes and scans I2C, verifies the BME280 identity,
 and displays live compensated temperature, humidity, and pressure readings on
 the 800 x 480 RGB565 display. Sensor communication and range failures replace
-the readings with an explicit error state. No Wi-Fi credentials are present
-yet.
+the readings with an explicit error state. Wi-Fi runs independently of sensor
+sampling and displays an obvious online/offline state.
+
+## Wi-Fi configuration
+
+Copy `main/include/private_config.example.h` to
+`main/include/private_config.h`, then replace the example SSID and password.
+The private file is ignored by Git and must never be committed. If it is absent,
+the application remains operational and displays `NETWORK OFFLINE`.
+
+The Version 1 panel uses static IPv4 address `192.168.20.204/24`, gateway
+`192.168.20.1`, and DNS server `192.168.20.1`.
 
 Expected addresses include `0x14` or `0x5D` (GT911 touch), `0x51` (RTC), and
 `0x76` or `0x77` (BME280). The CH422G expander uses command addresses `0x24`
@@ -70,11 +80,14 @@ main/
   board/i2c_bus.cpp
   sensors/environment_sensor.cpp
   ui/dashboard.cpp
+  network/network.cpp
   include/board_config.hpp
   include/display.hpp
   include/i2c_bus.hpp
   include/environment_sensor.hpp
   include/dashboard.hpp
+  include/network.hpp
+  include/private_config.example.h
   vendor/bme280/ (Bosch BME280 SensorAPI)
 ```
 

@@ -15,13 +15,17 @@ constexpr auto text = display::rgb565(238, 243, 244);
 constexpr auto muted = display::rgb565(143, 165, 174);
 constexpr auto error = display::rgb565(220, 65, 65);
 
-void draw_shell() {
+void draw_shell(bool network_online) {
     display::clear(background);
     display::fill_rectangle(0, 0, 800, 88, header);
     display::fill_rectangle(0, 84, 800, 4, accent);
     display::draw_text(34, 22, "TPB9000", 6, text);
     display::draw_text(570, 32, "OPERATOR PANEL", 3, muted);
     display::draw_text(34, 108, "ENCLOSURE ENVIRONMENT", 3, muted);
+    if (!network_online) {
+        display::fill_rectangle(0, 0, 8, 480, error);
+        display::fill_rectangle(792, 0, 8, 480, error);
+    }
 }
 
 void draw_card(int x, const char* label, const char* value, const char* unit,
@@ -34,7 +38,8 @@ void draw_card(int x, const char* label, const char* value, const char* unit,
 }
 }  // namespace
 
-esp_err_t show_reading(const environment::Reading& reading) {
+esp_err_t show_reading(const environment::Reading& reading,
+                       bool network_online) {
     char temperature[16] = {};
     char humidity[16] = {};
     char pressure[16] = {};
@@ -42,21 +47,25 @@ esp_err_t show_reading(const environment::Reading& reading) {
     std::snprintf(humidity, sizeof(humidity), "%.1f", reading.humidity_percent);
     std::snprintf(pressure, sizeof(pressure), "%.1f", reading.pressure_hpa);
 
-    draw_shell();
+    draw_shell(network_online);
     draw_card(34, "TEMPERATURE", temperature, "DEGREES F", warm);
     draw_card(284, "HUMIDITY", humidity, "PERCENT RH", text);
     draw_card(534, "PRESSURE", pressure, "HPA", text);
-    display::draw_text(34, 442, "SENSOR ONLINE", 3, accent);
+    display::draw_text(34, 442, network_online ? "NETWORK ONLINE"
+                                               : "NETWORK OFFLINE",
+                       3, network_online ? accent : error);
     return display::present();
 }
 
-esp_err_t show_sensor_error() {
-    draw_shell();
+esp_err_t show_sensor_error(bool network_online) {
+    draw_shell(network_online);
     display::fill_rectangle(34, 154, 732, 256, card);
     display::fill_rectangle(34, 154, 732, 6, error);
     display::draw_text(82, 226, "SENSOR ERROR", 8, error);
     display::draw_text(166, 326, "CHECK BME280 CONNECTION", 3, text);
-    display::draw_text(34, 442, "READINGS UNAVAILABLE", 3, error);
+    display::draw_text(34, 442, network_online ? "NETWORK ONLINE"
+                                               : "NETWORK OFFLINE",
+                       3, network_online ? accent : error);
     return display::present();
 }
 

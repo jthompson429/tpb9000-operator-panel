@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "i2c_bus.hpp"
+#include "network.hpp"
 
 namespace {
 constexpr char tag[] = "tpb9000";
@@ -29,6 +30,11 @@ extern "C" void app_main() {
     if (result != ESP_OK) fatal("Display initialization failed", result);
     result = tpb9000::environment::initialize();
     if (result != ESP_OK) fatal("BME280 initialization failed", result);
+    result = tpb9000::network::initialize();
+    if (result != ESP_OK) {
+        ESP_LOGE(tag, "Network initialization failed: %s; continuing offline",
+                 esp_err_to_name(result));
+    }
     ESP_LOGI(tag, "Bring-up complete; logging live readings every two seconds");
     while (true) {
         tpb9000::environment::Reading reading = {};
@@ -38,7 +44,8 @@ extern "C" void app_main() {
                      reading.temperature_f, reading.humidity_percent,
                      reading.pressure_hpa);
             const esp_err_t display_result =
-                tpb9000::dashboard::show_reading(reading);
+                tpb9000::dashboard::show_reading(
+                    reading, tpb9000::network::online());
             if (display_result != ESP_OK) {
                 ESP_LOGE(tag, "Dashboard update failed: %s",
                          esp_err_to_name(display_result));
@@ -46,7 +53,7 @@ extern "C" void app_main() {
         } else {
             ESP_LOGE(tag, "Environment: SENSOR ERROR (%s)",
                      esp_err_to_name(result));
-            tpb9000::dashboard::show_sensor_error();
+            tpb9000::dashboard::show_sensor_error(tpb9000::network::online());
         }
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
