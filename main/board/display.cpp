@@ -154,6 +154,18 @@ void clear(Color color) {
     for (size_t index = 0; index < count; ++index) pixels[index] = color;
 }
 
+esp_err_t draw_background(const Color* source, size_t pixel_count) {
+    const size_t expected_count =
+        static_cast<size_t>(board::display_width) * board::display_height;
+    if (framebuffer == nullptr || source == nullptr) return ESP_ERR_INVALID_STATE;
+    if (pixel_count != expected_count) return ESP_ERR_INVALID_SIZE;
+    volatile uint16_t* destination = framebuffer;
+    for (size_t index = 0; index < expected_count; ++index) {
+        destination[index] = source[index];
+    }
+    return ESP_OK;
+}
+
 void fill_rectangle(int x, int y, int width, int height, Color color) {
     if (framebuffer == nullptr || width <= 0 || height <= 0) return;
     const int left = x < 0 ? 0 : x;

@@ -1,40 +1,59 @@
 #include "dashboard.hpp"
 
 #include <cstdio>
+#include <cstring>
 
 #include "display.hpp"
+#include "esp_app_desc.h"
 
 namespace tpb9000::dashboard {
 namespace {
-constexpr auto background = display::rgb565(10, 18, 28);
-constexpr auto header = display::rgb565(15, 32, 46);
-constexpr auto card = display::rgb565(22, 43, 57);
-constexpr auto accent = display::rgb565(43, 187, 173);
-constexpr auto warm = display::rgb565(241, 183, 55);
 constexpr auto text = display::rgb565(238, 243, 244);
-constexpr auto muted = display::rgb565(143, 165, 174);
+constexpr auto muted = display::rgb565(176, 176, 176);
+constexpr auto online = display::rgb565(34, 197, 94);
 constexpr auto error = display::rgb565(220, 65, 65);
 
-void draw_shell(bool network_online) {
-    display::clear(background);
-    display::fill_rectangle(0, 0, 800, 88, header);
-    display::fill_rectangle(0, 84, 800, 4, accent);
-    display::draw_text(34, 22, "TPB9000", 6, text);
-    display::draw_text(570, 32, "OPERATOR PANEL", 3, muted);
-    display::draw_text(34, 108, "ENCLOSURE ENVIRONMENT", 3, muted);
-    if (!network_online) {
-        display::fill_rectangle(0, 0, 8, 480, error);
-        display::fill_rectangle(792, 0, 8, 480, error);
-    }
+extern const uint8_t background_normal_start[]
+    asm("_binary_background_normal_rgb565_start");
+extern const uint8_t background_normal_end[]
+    asm("_binary_background_normal_rgb565_end");
+extern const uint8_t background_offline_start[]
+    asm("_binary_background_offline_rgb565_start");
+extern const uint8_t background_offline_end[]
+    asm("_binary_background_offline_rgb565_end");
+
+esp_err_t draw_shell(bool network_online) {
+    const uint8_t* start = network_online ? background_normal_start
+                                          : background_offline_start;
+    const uint8_t* end = network_online ? background_normal_end
+                                        : background_offline_end;
+    return display::draw_background(
+        reinterpret_cast<const display::Color*>(start),
+        static_cast<size_t>(end - start) / sizeof(display::Color));
 }
 
-void draw_card(int x, const char* label, const char* value, const char* unit,
-               display::Color value_color) {
-    display::fill_rectangle(x, 154, 232, 256, card);
-    display::fill_rectangle(x, 154, 232, 5, accent);
-    display::draw_text(x + 22, 180, label, 3, muted);
-    display::draw_text(x + 20, 252, value, 6, value_color);
-    display::draw_text(x + 22, 344, unit, 3, muted);
+int text_width(const char* value, int scale) {
+    const size_t length = std::strlen(value);
+    return length == 0 ? 0 : static_cast<int>((length * 6 - 1) * scale);
+}
+
+void draw_centered_value(int center_x, int y, const char* value, int scale) {
+    display::draw_text(center_x - text_width(value, scale) / 2, y, value,
+                       scale, text);
+}
+
+void draw_footer(bool network_online) {
+    constexpr int footer_y = 413;
+    const char* network_text = network_online ? "NETWORK ONLINE"
+                                              : "NETWORK OFFLINE";
+    display::draw_text(64, footer_y, network_text, 2,
+                       network_online ? online : error);
+
+    char firmware_text[24] = {};
+    std::snprintf(firmware_text, sizeof(firmware_text), "FW %.13s",
+                  esp_app_get_description()->version);
+    display::draw_text(736 - text_width(firmware_text, 2), footer_y,
+                       firmware_text, 2, muted);
 }
 }  // namespace
 
@@ -47,25 +66,23 @@ esp_err_t show_reading(const environment::Reading& reading,
     std::snprintf(humidity, sizeof(humidity), "%.1f", reading.humidity_percent);
     std::snprintf(pressure, sizeof(pressure), "%.1f", reading.pressure_hpa);
 
-    draw_shell(network_online);
-    draw_card(34, "TEMPERATURE", temperature, "DEGREES F", warm);
-    draw_card(284, "HUMIDITY", humidity, "PERCENT RH", text);
-    draw_card(534, "PRESSURE", pressure, "HPA", text);
-    display::draw_text(34, 442, network_online ? "NETWORK ONLINE"
-                                               : "NETWORK OFFLINE",
-                       3, network_online ? accent : error);
+    const esp_err_t shell_result = draw_shell(network_online);
+    if (shell_result != ESP_OK) return shell_result;
+    draw_centered_value(388, 226, temperature, 5);
+    draw_centered_value(542, 226, humidity, 5);
+    draw_centered_value(691, 230, pressure, 4);
+    draw_footer(network_online);
     return display::present();
 }
 
 esp_err_t show_sensor_error(bool network_online) {
-    draw_shell(network_online);
-    display::fill_rectangle(34, 154, 732, 256, card);
-    display::fill_rectangle(34, 154, 732, 6, error);
-    display::draw_text(82, 226, "SENSOR ERROR", 8, error);
-    display::draw_text(166, 326, "CHECK BME280 CONNECTION", 3, text);
-    display::draw_text(34, 442, network_online ? "NETWORK ONLINE"
-                                               : "NETWORK OFFLINE",
-                       3, network_online ? accent : error);
+    const esp_err_t shell_result = draw_shell(network_online);
+    if (shell_result != ESP_OK) return shell_result;
+    display::fill_rectangle(315, 94, 449, 316, display::rgb565(8, 12, 18));
+    display::fill_rectangle(315, 94, 449, 5, error);
+    display::draw_text(373, 205, "SENSOR ERROR", 6, error);
+    display::draw_text(371, 282, "CHECK BME280", 3, text);
+    draw_footer(network_online);
     return display::present();
 }
 

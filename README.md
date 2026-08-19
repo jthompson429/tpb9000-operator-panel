@@ -19,7 +19,7 @@ its separate FFC controller must continue operating if this display is offline.
 
 The terminal shares GPIO 8 (SDA) and GPIO 9 (SCL) with onboard devices.
 
-## Current milestone: live environmental dashboard
+## Version 1 status: complete
 
 The current firmware initializes and scans I2C, verifies the BME280 identity,
 and displays live compensated temperature, humidity, and pressure readings on
@@ -30,6 +30,15 @@ at startup or fails later, the panel remains running, shows `SENSOR ERROR`, and
 retries the sensor every ten seconds without interrupting network operation.
 Out-of-range values and physically implausible two-second changes are rejected
 instead of being displayed as current measurements.
+
+The production dashboard uses embedded 800 x 480 RGB565 artwork with separate
+normal and offline backgrounds. Dynamic readings, network state, sensor errors,
+and the firmware version are rendered over the artwork. Source PNGs and design
+iterations are retained under `design/`; `tools/png_to_rgb565.py` converts the
+production PNGs under `main/assets/` into the raw assets embedded by ESP-IDF.
+
+Support for an INA219 voltage/current/power monitor is a possible post-v1
+enhancement and is intentionally outside the completed Version 1 scope.
 
 ## Wi-Fi configuration
 
@@ -79,6 +88,7 @@ Exit the monitor with `Ctrl+]`. If port detection fails, use
 
 ```text
 main/
+  assets/ (production PNG and embedded RGB565 backgrounds)
   app_main.cpp
   board/display.cpp
   board/i2c_bus.cpp
@@ -93,6 +103,9 @@ main/
   include/network.hpp
   include/private_config.example.h
   vendor/bme280/ (Bosch BME280 SensorAPI)
+design/ (source artwork and dashboard iterations)
+tools/png_to_rgb565.py
+partitions.csv
 ```
 
 Sensor, Wi-Fi, and UI modules remain separate from `app_main.cpp`.

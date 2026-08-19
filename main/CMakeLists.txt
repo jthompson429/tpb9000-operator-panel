@@ -5,6 +5,8 @@ idf_component_register(
          "network/network.cpp"
     INCLUDE_DIRS "include" "vendor/bme280"
     REQUIRES esp_driver_i2c esp_driver_gpio esp_lcd esp_wifi esp_netif
-             esp_event nvs_flash
+             esp_event nvs_flash esp_app_format
              esp_timer
+    EMBED_FILES "assets/background_normal.rgb565"
+                "assets/background_offline.rgb565"
 )
