@@ -25,7 +25,9 @@ The current firmware initializes and scans I2C, verifies the BME280 identity,
 and displays live compensated temperature, humidity, and pressure readings on
 the 800 x 480 RGB565 display. Sensor communication and range failures replace
 the readings with an explicit error state. Wi-Fi runs independently of sensor
-sampling and displays an obvious online/offline state.
+sampling and displays an obvious online/offline state. If the BME280 is absent
+at startup or fails later, the panel remains running, shows `SENSOR ERROR`, and
+retries the sensor every ten seconds without interrupting network operation.
 
 ## Wi-Fi configuration
 

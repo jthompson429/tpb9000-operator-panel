@@ -58,6 +58,19 @@ esp_err_t add_i2c_device(uint8_t address) {
     };
     return i2c_master_bus_add_device(i2c::handle(), &config, &i2c_device);
 }
+
+void reset_sensor() {
+    ready = false;
+    sensor = {};
+    if (i2c_device != nullptr) {
+        const esp_err_t result = i2c_master_bus_rm_device(i2c_device);
+        if (result != ESP_OK) {
+            ESP_LOGW(tag, "Could not detach failed BME280 device: %s",
+                     esp_err_to_name(result));
+        }
+        i2c_device = nullptr;
+    }
+}
 }  // namespace
 
 esp_err_t initialize() {
@@ -83,12 +96,16 @@ esp_err_t initialize() {
     int8_t sensor_result = bme280_init(&sensor);
     if (sensor_result != BME280_OK) {
         ESP_LOGE(tag, "Bosch driver initialization failed: %d", sensor_result);
+        reset_sensor();
         return ESP_FAIL;
     }
 
     bme280_settings settings = {};
     sensor_result = bme280_get_sensor_settings(&settings, &sensor);
-    if (sensor_result != BME280_OK) return ESP_FAIL;
+    if (sensor_result != BME280_OK) {
+        reset_sensor();
+        return ESP_FAIL;
+    }
     settings.osr_t = BME280_OVERSAMPLING_2X;
     settings.osr_p = BME280_OVERSAMPLING_16X;
     settings.osr_h = BME280_OVERSAMPLING_1X;
@@ -96,14 +113,23 @@ esp_err_t initialize() {
     settings.standby_time = BME280_STANDBY_TIME_1000_MS;
     sensor_result = bme280_set_sensor_settings(BME280_SEL_ALL_SETTINGS,
                                                 &settings, &sensor);
-    if (sensor_result != BME280_OK) return ESP_FAIL;
+    if (sensor_result != BME280_OK) {
+        reset_sensor();
+        return ESP_FAIL;
+    }
     sensor_result = bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, &sensor);
-    if (sensor_result != BME280_OK) return ESP_FAIL;
+    if (sensor_result != BME280_OK) {
+        reset_sensor();
+        return ESP_FAIL;
+    }
 
     // Do not expose the power-on register contents as the first live reading.
     uint32_t measurement_delay_us = 0;
     sensor_result = bme280_cal_meas_delay(&measurement_delay_us, &settings);
-    if (sensor_result != BME280_OK) return ESP_FAIL;
+    if (sensor_result != BME280_OK) {
+        reset_sensor();
+        return ESP_FAIL;
+    }
     sensor.delay_us(measurement_delay_us, sensor.intf_ptr);
 
     ready = true;
@@ -118,6 +144,7 @@ esp_err_t read(Reading& reading) {
     const int8_t result = bme280_get_sensor_data(BME280_ALL, &data, &sensor);
     if (result != BME280_OK) {
         ESP_LOGE(tag, "Sensor read failed: %d", result);
+        reset_sensor();
         return ESP_FAIL;
     }
     if (!std::isfinite(data.temperature) || !std::isfinite(data.humidity) ||
@@ -125,6 +152,7 @@ esp_err_t read(Reading& reading) {
         data.humidity > 100.0 || data.pressure < 30000.0 ||
         data.pressure > 110000.0) {
         ESP_LOGE(tag, "Sensor returned invalid values");
+        reset_sensor();
         return ESP_ERR_INVALID_RESPONSE;
     }
     reading.temperature_c = data.temperature;
