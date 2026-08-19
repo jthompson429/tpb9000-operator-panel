@@ -1,0 +1,8 @@
+/build/
+/sdkconfig
+/sdkconfig.old
+/dependencies.lock
+/managed_components/
+/main/include/private_config.h
+.DS_Store
+.vscode/
