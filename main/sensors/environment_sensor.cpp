@@ -17,10 +17,19 @@ constexpr char tag[] = "bme280";
 constexpr uint8_t primary_address = 0x76;
 constexpr uint8_t alternate_address = 0x77;
 constexpr int transaction_timeout_ms = 100;
+constexpr double minimum_temperature_c = -40.0;
+constexpr double maximum_temperature_c = 70.0;
+constexpr double minimum_pressure_pa = 80000.0;
+constexpr double maximum_pressure_pa = 110000.0;
+constexpr double maximum_temperature_step_c = 8.5;
+constexpr double maximum_humidity_step_percent = 20.0;
+constexpr double maximum_pressure_step_pa = 1000.0;
 
 bme280_dev sensor = {};
 i2c_master_dev_handle_t i2c_device = nullptr;
 bool ready = false;
+bme280_data previous_data = {};
+bool has_previous_data = false;
 
 int8_t read_registers(uint8_t register_address, uint8_t* data, uint32_t length,
                       void* interface_pointer) {
@@ -61,6 +70,8 @@ esp_err_t add_i2c_device(uint8_t address) {
 
 void reset_sensor() {
     ready = false;
+    has_previous_data = false;
+    previous_data = {};
     sensor = {};
     if (i2c_device != nullptr) {
         const esp_err_t result = i2c_master_bus_rm_device(i2c_device);
@@ -147,14 +158,30 @@ esp_err_t read(Reading& reading) {
         reset_sensor();
         return ESP_FAIL;
     }
-    if (!std::isfinite(data.temperature) || !std::isfinite(data.humidity) ||
-        !std::isfinite(data.pressure) || data.humidity < 0.0 ||
-        data.humidity > 100.0 || data.pressure < 30000.0 ||
-        data.pressure > 110000.0) {
-        ESP_LOGE(tag, "Sensor returned invalid values");
+    const bool outside_operating_range =
+        !std::isfinite(data.temperature) || !std::isfinite(data.humidity) ||
+        !std::isfinite(data.pressure) ||
+        data.temperature < minimum_temperature_c ||
+        data.temperature > maximum_temperature_c || data.humidity < 0.0 ||
+        data.humidity > 100.0 || data.pressure < minimum_pressure_pa ||
+        data.pressure >= maximum_pressure_pa;
+    const bool implausible_step =
+        has_previous_data &&
+        (std::abs(data.temperature - previous_data.temperature) >
+             maximum_temperature_step_c ||
+         std::abs(data.humidity - previous_data.humidity) >
+             maximum_humidity_step_percent ||
+         std::abs(data.pressure - previous_data.pressure) >
+             maximum_pressure_step_pa);
+    if (outside_operating_range || implausible_step) {
+        ESP_LOGE(tag,
+                 "Rejected implausible reading: %.2f C, %.2f %%RH, %.2f hPa",
+                 data.temperature, data.humidity, data.pressure / 100.0);
         reset_sensor();
         return ESP_ERR_INVALID_RESPONSE;
     }
+    previous_data = data;
+    has_previous_data = true;
     reading.temperature_c = data.temperature;
     reading.temperature_f = data.temperature * 9.0 / 5.0 + 32.0;
     reading.humidity_percent = data.humidity;

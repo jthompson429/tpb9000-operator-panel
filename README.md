@@ -28,6 +28,8 @@ the readings with an explicit error state. Wi-Fi runs independently of sensor
 sampling and displays an obvious online/offline state. If the BME280 is absent
 at startup or fails later, the panel remains running, shows `SENSOR ERROR`, and
 retries the sensor every ten seconds without interrupting network operation.
+Out-of-range values and physically implausible two-second changes are rejected
+instead of being displayed as current measurements.
 
 ## Wi-Fi configuration
 
