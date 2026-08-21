@@ -92,6 +92,14 @@ bool configured() { return TPB9000_WIFI_SSID[0] != '\0'; }
 
 bool online() { return has_ip.load(); }
 
+bool rssi_dbm(int8_t& value) {
+    if (!online()) return false;
+    wifi_ap_record_t access_point = {};
+    if (esp_wifi_sta_get_ap_info(&access_point) != ESP_OK) return false;
+    value = access_point.rssi;
+    return true;
+}
+
 esp_err_t initialize() {
     if (!configured()) {
         ESP_LOGW(tag, "Wi-Fi credentials are not configured; remaining offline");

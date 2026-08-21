@@ -40,6 +40,20 @@ production PNGs under `main/assets/` into the raw assets embedded by ESP-IDF.
 Support for an INA219 voltage/current/power monitor is a possible post-v1
 enhancement and is intentionally outside the completed Version 1 scope.
 
+## Post-v1 development
+
+The first v0.2 foundation adds a read-only local JSON API without changing the
+verified v1 display behavior. See [API v1](docs/api-v1.md) and the
+[v0.2 integration plan](docs/v0.2-integration-plan.md). Hardware-specific
+drivers remain disabled until their exact modules, electrical limits, and pin
+paths are confirmed.
+
+Confirmed v0.2 hardware includes a VEML7700 light sensor, an `R100` INA219
+breakout intended for a 12 VDC rail, a Waveshare HMMD mmWave presence sensor,
+a 3-24 V active piezo buzzer, and an A02-family automatic-UART ultrasonic
+hopper sensor. The future dashboard will run separately on the mini PC at
+`tpb9000-server.local`; the operator panel does not depend on that host.
+
 ## Wi-Fi configuration
 
 Copy `main/include/private_config.example.h` to
