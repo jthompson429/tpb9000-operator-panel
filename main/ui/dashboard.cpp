@@ -1,5 +1,6 @@
 #include "dashboard.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -12,6 +13,7 @@ constexpr auto text = display::rgb565(238, 243, 244);
 constexpr auto muted = display::rgb565(176, 176, 176);
 constexpr auto online = display::rgb565(34, 197, 94);
 constexpr auto error = display::rgb565(220, 65, 65);
+constexpr auto power_accent = display::rgb565(0, 209, 255);
 
 extern const uint8_t background_normal_start[]
     asm("_binary_background_normal_rgb565_start");
@@ -42,12 +44,31 @@ void draw_centered_value(int center_x, int y, const char* value, int scale) {
                        scale, text);
 }
 
-void draw_footer(bool network_online) {
+void draw_footer(bool network_online,
+                 bool power_available,
+                 const power::Reading& power_reading) {
     constexpr int footer_y = 413;
     const char* network_text = network_online ? "NETWORK ONLINE"
                                               : "NETWORK OFFLINE";
     display::draw_text(64, footer_y, network_text, 2,
                        network_online ? online : error);
+
+    char power_text[40] = {};
+    if (power_available) {
+        const double displayed_current =
+            std::abs(power_reading.current_a) < 0.005
+                ? 0.0
+                : power_reading.current_a;
+        std::snprintf(power_text, sizeof(power_text),
+                      "PWR %.2fV %.2fA %.2fW",
+                      power_reading.bus_voltage_v, displayed_current,
+                      power_reading.power_w);
+    } else {
+        std::snprintf(power_text, sizeof(power_text), "PWR UNAVAILABLE");
+    }
+    display::draw_text(400 - text_width(power_text, 2) / 2, footer_y,
+                       power_text, 2,
+                       power_available ? power_accent : error);
 
     char firmware_text[24] = {};
     std::snprintf(firmware_text, sizeof(firmware_text), "FW %.13s",
@@ -58,7 +79,9 @@ void draw_footer(bool network_online) {
 }  // namespace
 
 esp_err_t show_reading(const environment::Reading& reading,
-                       bool network_online) {
+                       bool network_online,
+                       bool power_available,
+                       const power::Reading& power_reading) {
     char temperature[16] = {};
     char humidity[16] = {};
     char pressure[16] = {};
@@ -71,18 +94,20 @@ esp_err_t show_reading(const environment::Reading& reading,
     draw_centered_value(388, 226, temperature, 5);
     draw_centered_value(542, 226, humidity, 5);
     draw_centered_value(691, 230, pressure, 4);
-    draw_footer(network_online);
+    draw_footer(network_online, power_available, power_reading);
     return display::present();
 }
 
-esp_err_t show_sensor_error(bool network_online) {
+esp_err_t show_sensor_error(bool network_online,
+                            bool power_available,
+                            const power::Reading& power_reading) {
     const esp_err_t shell_result = draw_shell(network_online);
     if (shell_result != ESP_OK) return shell_result;
     display::fill_rectangle(315, 94, 449, 316, display::rgb565(8, 12, 18));
     display::fill_rectangle(315, 94, 449, 5, error);
     display::draw_text(373, 205, "SENSOR ERROR", 6, error);
     display::draw_text(371, 282, "CHECK BME280", 3, text);
-    draw_footer(network_online);
+    draw_footer(network_online, power_available, power_reading);
     return display::present();
 }
 

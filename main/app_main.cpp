@@ -110,6 +110,8 @@ extern "C" void app_main() {
         tpb9000::environment::Reading reading = {};
         result = sensor_ready ? tpb9000::environment::read(reading)
                               : ESP_ERR_INVALID_STATE;
+        const tpb9000::status::Snapshot live_status =
+            tpb9000::status::snapshot();
         if (sensor_ready && result == ESP_OK) {
             tpb9000::status::set_environment(reading);
             ESP_LOGI(tag, "Environment: %.1f F, %.1f %%RH, %.1f hPa",
@@ -117,7 +119,8 @@ extern "C" void app_main() {
                      reading.pressure_hpa);
             const esp_err_t display_result =
                 tpb9000::dashboard::show_reading(
-                    reading, tpb9000::network::online());
+                    reading, tpb9000::network::online(),
+                    live_status.power_available, live_status.power);
             if (display_result != ESP_OK) {
                 ESP_LOGE(tag, "Dashboard update failed: %s",
                          esp_err_to_name(display_result));
@@ -135,7 +138,8 @@ extern "C" void app_main() {
                      esp_err_to_name(result));
             const esp_err_t display_result =
                 tpb9000::dashboard::show_sensor_error(
-                    tpb9000::network::online());
+                    tpb9000::network::online(),
+                    live_status.power_available, live_status.power);
             if (display_result == ESP_OK) {
                 tpb9000::status::note_display_refresh();
             }
