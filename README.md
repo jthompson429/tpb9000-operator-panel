@@ -117,6 +117,13 @@ idf.py flash monitor
 Exit the monitor with `Ctrl+]`. If port detection fails, use
 `idf.py -p /dev/cu.usbmodemXXXX flash monitor` with the actual device port.
 
+For reliable native-USB download-mode entry, disconnect the 12 V supply and
+power the panel from a known data-capable USB cable only. With USB
+disconnected, hold `BOOT`, reconnect USB, wait about three seconds, and then
+release `BOOT`. On macOS the ROM downloader should appear as
+`/dev/cu.usbmodemXXXX`. Reconnect 12 V only after flashing has completed and
+the application has rebooted.
+
 ## Structure
 
 ```text
