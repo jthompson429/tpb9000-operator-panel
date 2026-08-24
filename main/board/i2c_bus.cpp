@@ -16,6 +16,7 @@ const char* known_device_name(uint8_t address) {
         case 0x5D: return "GT911 touch controller";
         case 0x24:
         case 0x38: return "CH422G I/O expander";
+        case 0x40: return "INA219 power monitor";
         case 0x51: return "PCF85063A real-time clock";
         case 0x76:
         case 0x77: return "BME280 candidate";

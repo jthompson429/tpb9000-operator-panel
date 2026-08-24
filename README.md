@@ -84,6 +84,25 @@ shows that the terminal-block `VOUT` pin is the selectable `I2C_VCC` rail and
 is factory-configured for 3.3 V. Confirm the breakout's pin labels before
 applying power.
 
+## INA219 wiring
+
+The verified `R100` INA219 monitors only the operator panel's 12 VDC feed. Its
+logic side shares the exposed I2C terminal with the BME280:
+
+| INA219 | Connection |
+| --- | --- |
+| `VCC` | Panel `VOUT` (3.3 V) |
+| `GND` | Panel `GND` |
+| `SDA` | Panel `SDA` |
+| `SCL` | Panel `SCL` |
+| `Vin+` | Positive lead from the 12 V supply |
+| `Vin-` | Panel 9-36 V positive input |
+
+The 12 V supply negative remains connected directly to panel `GND`. Never
+connect 12 V to INA219 `VCC`, and do not place the entire TPB9000 system load
+through this breakout. Initial hardware validation measured approximately
+12.25 V, 0.205 A, and 2.53 W with the display active.
+
 ## Build, flash, and monitor
 
 This is a native ESP-IDF project:

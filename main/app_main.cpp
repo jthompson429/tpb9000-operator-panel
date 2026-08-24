@@ -8,12 +8,58 @@
 #include "freertos/task.h"
 #include "i2c_bus.hpp"
 #include "network.hpp"
+#include "power_sensor.hpp"
 #include "status_api.hpp"
 #include "system_status.hpp"
 
 namespace {
 constexpr char tag[] = "tpb9000";
 constexpr unsigned sensor_retry_interval_cycles = 5;
+
+void power_monitor_task(void*) {
+    bool sensor_ready = false;
+    unsigned retry_seconds = 0;
+    unsigned log_cycles = 0;
+    while (true) {
+        if (!sensor_ready && retry_seconds == 0) {
+            const esp_err_t result = tpb9000::power::initialize();
+            sensor_ready = result == ESP_OK;
+            if (!sensor_ready) {
+                tpb9000::status::set_power_unavailable();
+                ESP_LOGW(tag,
+                         "INA219 unavailable (%s); retrying in ten seconds",
+                         esp_err_to_name(result));
+                retry_seconds = 10;
+            }
+        }
+
+        if (sensor_ready) {
+            tpb9000::power::Reading reading = {};
+            const esp_err_t result = tpb9000::power::read(reading);
+            if (result == ESP_OK) {
+                tpb9000::status::set_power(reading);
+                if (++log_cycles >= 10) {
+                    ESP_LOGI(tag, "Power: %.3f V, %.3f A, %.3f W",
+                             reading.bus_voltage_v, reading.current_a,
+                             reading.power_w);
+                    log_cycles = 0;
+                }
+            } else {
+                sensor_ready = false;
+                retry_seconds = 10;
+                log_cycles = 0;
+                tpb9000::status::set_power_unavailable();
+                ESP_LOGE(tag,
+                         "INA219 read failed (%s); retrying in ten seconds",
+                         esp_err_to_name(result));
+            }
+        } else if (retry_seconds > 0) {
+            --retry_seconds;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 void fatal(const char* operation, esp_err_t error) {
     ESP_LOGE(tag, "%s: %s", operation, esp_err_to_name(error));
     ESP_LOGE(tag, "Restarting in five seconds");
@@ -40,6 +86,11 @@ extern "C" void app_main() {
     if (result != ESP_OK) {
         ESP_LOGE(tag, "Status API initialization failed: %s; continuing",
                  esp_err_to_name(result));
+    }
+    if (xTaskCreate(power_monitor_task, "power_monitor", 4096, nullptr, 5,
+                    nullptr) != pdPASS) {
+        ESP_LOGE(tag, "Could not start INA219 monitor; continuing without it");
+        tpb9000::status::set_power_unavailable();
     }
     bool sensor_ready = false;
     unsigned sensor_retry_cycles = 0;

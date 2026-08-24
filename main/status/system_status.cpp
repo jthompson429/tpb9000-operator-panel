@@ -30,6 +30,23 @@ void set_environment_unavailable() {
     taskEXIT_CRITICAL(&lock);
 }
 
+void set_power(const power::Reading& reading) {
+    const uint64_t timestamp = uptime_ms();
+    taskENTER_CRITICAL(&lock);
+    current.power_available = true;
+    current.power = reading;
+    current.power_updated_ms = timestamp;
+    taskEXIT_CRITICAL(&lock);
+}
+
+void set_power_unavailable() {
+    taskENTER_CRITICAL(&lock);
+    current.power_available = false;
+    current.power = {};
+    current.power_updated_ms = 0;
+    taskEXIT_CRITICAL(&lock);
+}
+
 void note_display_refresh() {
     const uint64_t timestamp = uptime_ms();
     taskENTER_CRITICAL(&lock);

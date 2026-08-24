@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS "app_main.cpp" "board/display.cpp" "board/i2c_bus.cpp"
-         "sensors/environment_sensor.cpp" "vendor/bme280/bme280.c"
+         "sensors/environment_sensor.cpp" "sensors/power_sensor.cpp"
+         "vendor/bme280/bme280.c"
          "ui/dashboard.cpp"
          "network/network.cpp" "network/status_api.cpp"
          "status/system_status.cpp"

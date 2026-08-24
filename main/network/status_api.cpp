@@ -54,7 +54,7 @@ esp_err_t info_handler(httpd_req_t* request) {
         "\"board\":\"%s\",\"firmware_version\":\"%s\","
         "\"project_name\":\"%s\",\"build_date\":\"%s\","
         "\"build_time\":\"%s\",\"esp_idf_version\":\"%s\","
-        "\"capabilities\":{\"environment\":true,\"power\":false,"
+        "\"capabilities\":{\"environment\":true,\"power\":true,"
         "\"ambient_light\":false,\"operator_presence\":false,"
         "\"hopper\":false,\"buzzer\":false}}",
         schema_version, board::model, application->version,
@@ -73,6 +73,10 @@ esp_err_t status_handler(httpd_req_t* request) {
     char humidity_json[32] = "null";
     char pressure_json[32] = "null";
     char environment_updated_json[32] = "null";
+    char bus_voltage_json[32] = "null";
+    char current_json[32] = "null";
+    char power_json[32] = "null";
+    char power_updated_json[32] = "null";
     if (has_rssi) std::snprintf(rssi_json, sizeof(rssi_json), "%d", rssi);
     if (live.environment_available) {
         std::snprintf(temperature_json, sizeof(temperature_json), "%.2f",
@@ -86,6 +90,16 @@ esp_err_t status_handler(httpd_req_t* request) {
                       static_cast<unsigned long long>(
                           live.environment_updated_ms));
     }
+    if (live.power_available) {
+        std::snprintf(bus_voltage_json, sizeof(bus_voltage_json), "%.3f",
+                      live.power.bus_voltage_v);
+        std::snprintf(current_json, sizeof(current_json), "%.4f",
+                      live.power.current_a);
+        std::snprintf(power_json, sizeof(power_json), "%.3f",
+                      live.power.power_w);
+        std::snprintf(power_updated_json, sizeof(power_updated_json), "%llu",
+                      static_cast<unsigned long long>(live.power_updated_ms));
+    }
     return send_json(
         request,
         "{\"schema_version\":\"%s\",\"machine\":{\"online\":%s,"
@@ -93,8 +107,8 @@ esp_err_t status_handler(httpd_req_t* request) {
         "\"environment\":{\"available\":%s,\"temperature_f\":%s,"
         "\"humidity_percent\":%s,\"pressure_hpa\":%s,"
         "\"ambient_lux\":null,\"updated_ms\":%s},"
-        "\"power\":{\"available\":false,\"bus_voltage_v\":null,"
-        "\"current_a\":null,\"power_w\":null},"
+        "\"power\":{\"available\":%s,\"bus_voltage_v\":%s,"
+        "\"current_a\":%s,\"power_w\":%s,\"updated_ms\":%s},"
         "\"hopper\":{\"available\":false,\"percent\":null,"
         "\"distance_cm\":null,\"bars\":null,\"status\":\"Unavailable\"},"
         "\"display\":{\"brightness_percent\":100,"
@@ -104,6 +118,8 @@ esp_err_t status_handler(httpd_req_t* request) {
         esp_timer_get_time() / 1'000'000.0, rssi_json,
         live.environment_available ? "true" : "false", temperature_json,
         humidity_json, pressure_json, environment_updated_json,
+        live.power_available ? "true" : "false", bus_voltage_json,
+        current_json, power_json, power_updated_json,
         static_cast<unsigned long long>(live.display_refreshed_ms));
 }
 }  // namespace

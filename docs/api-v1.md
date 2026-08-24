@@ -24,7 +24,7 @@ Returns device identity, build information, and installed capabilities.
   "esp_idf_version": "v6.1-dev",
   "capabilities": {
     "environment": true,
-    "power": false,
+    "power": true,
     "ambient_light": false,
     "operator_presence": false,
     "hopper": false,
@@ -59,7 +59,8 @@ zero is reserved for a real measured zero.
     "available": false,
     "bus_voltage_v": null,
     "current_a": null,
-    "power_w": null
+    "power_w": null,
+    "updated_ms": null
   },
   "hopper": {
     "available": false,
@@ -77,5 +78,5 @@ zero is reserved for a real measured zero.
 }
 ```
 
-`updated_ms` and `last_refresh_ms` are milliseconds since the current boot,
-not wall-clock timestamps.
+All `updated_ms` fields and `last_refresh_ms` are milliseconds since the
+current boot, not wall-clock timestamps.
