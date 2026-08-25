@@ -47,6 +47,23 @@ void set_power_unavailable() {
     taskEXIT_CRITICAL(&lock);
 }
 
+void set_hopper(const hopper::Reading& reading) {
+    const uint64_t timestamp = uptime_ms();
+    taskENTER_CRITICAL(&lock);
+    current.hopper_available = true;
+    current.hopper = reading;
+    current.hopper_updated_ms = timestamp;
+    taskEXIT_CRITICAL(&lock);
+}
+
+void set_hopper_unavailable() {
+    taskENTER_CRITICAL(&lock);
+    current.hopper_available = false;
+    current.hopper = {};
+    current.hopper_updated_ms = 0;
+    taskEXIT_CRITICAL(&lock);
+}
+
 void note_display_refresh() {
     const uint64_t timestamp = uptime_ms();
     taskENTER_CRITICAL(&lock);

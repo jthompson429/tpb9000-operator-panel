@@ -27,7 +27,7 @@ Returns device identity, build information, and installed capabilities.
     "power": true,
     "ambient_light": false,
     "operator_presence": false,
-    "hopper": false,
+    "hopper": true,
     "buzzer": false
   }
 }
@@ -63,11 +63,12 @@ zero is reserved for a real measured zero.
     "updated_ms": null
   },
   "hopper": {
-    "available": false,
-    "percent": null,
-    "distance_cm": null,
-    "bars": null,
-    "status": "Unavailable"
+    "available": true,
+    "percent": 71.3,
+    "distance_cm": 15.4,
+    "bars": 5,
+    "status": "Normal",
+    "updated_ms": 123405
   },
   "display": {
     "brightness_percent": 100,
@@ -80,3 +81,8 @@ zero is reserved for a real measured zero.
 
 All `updated_ms` fields and `last_refresh_ms` are milliseconds since the
 current boot, not wall-clock timestamps.
+
+Hopper `status` is `Normal` for 4-6 bars, `Low` for 2-3 bars, `Critical` for
+one bar, `Empty` for zero bars, and `Unavailable` when no recent valid UART
+frame exists. The reported distance is a rolling median. Percentage uses the
+configured full/empty calibration distances rather than a fixed bar mapping.

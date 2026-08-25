@@ -56,7 +56,7 @@ esp_err_t info_handler(httpd_req_t* request) {
         "\"build_time\":\"%s\",\"esp_idf_version\":\"%s\","
         "\"capabilities\":{\"environment\":true,\"power\":true,"
         "\"ambient_light\":false,\"operator_presence\":false,"
-        "\"hopper\":false,\"buzzer\":false}}",
+        "\"hopper\":true,\"buzzer\":false}}",
         schema_version, board::model, application->version,
         application->project_name, application->date, application->time,
         esp_get_idf_version());
@@ -77,6 +77,10 @@ esp_err_t status_handler(httpd_req_t* request) {
     char current_json[32] = "null";
     char power_json[32] = "null";
     char power_updated_json[32] = "null";
+    char hopper_percent_json[32] = "null";
+    char hopper_distance_json[32] = "null";
+    char hopper_bars_json[16] = "null";
+    char hopper_updated_json[32] = "null";
     if (has_rssi) std::snprintf(rssi_json, sizeof(rssi_json), "%d", rssi);
     if (live.environment_available) {
         std::snprintf(temperature_json, sizeof(temperature_json), "%.2f",
@@ -100,6 +104,16 @@ esp_err_t status_handler(httpd_req_t* request) {
         std::snprintf(power_updated_json, sizeof(power_updated_json), "%llu",
                       static_cast<unsigned long long>(live.power_updated_ms));
     }
+    if (live.hopper_available) {
+        std::snprintf(hopper_percent_json, sizeof(hopper_percent_json), "%.1f",
+                      live.hopper.percent);
+        std::snprintf(hopper_distance_json, sizeof(hopper_distance_json),
+                      "%.1f", live.hopper.distance_cm);
+        std::snprintf(hopper_bars_json, sizeof(hopper_bars_json), "%u",
+                      live.hopper.bars);
+        std::snprintf(hopper_updated_json, sizeof(hopper_updated_json), "%llu",
+                      static_cast<unsigned long long>(live.hopper_updated_ms));
+    }
     return send_json(
         request,
         "{\"schema_version\":\"%s\",\"machine\":{\"online\":%s,"
@@ -109,8 +123,9 @@ esp_err_t status_handler(httpd_req_t* request) {
         "\"ambient_lux\":null,\"updated_ms\":%s},"
         "\"power\":{\"available\":%s,\"bus_voltage_v\":%s,"
         "\"current_a\":%s,\"power_w\":%s,\"updated_ms\":%s},"
-        "\"hopper\":{\"available\":false,\"percent\":null,"
-        "\"distance_cm\":null,\"bars\":null,\"status\":\"Unavailable\"},"
+        "\"hopper\":{\"available\":%s,\"percent\":%s,"
+        "\"distance_cm\":%s,\"bars\":%s,\"status\":\"%s\","
+        "\"updated_ms\":%s},"
         "\"display\":{\"brightness_percent\":100,"
         "\"automatic_brightness\":false,\"operator_present\":null,"
         "\"last_refresh_ms\":%llu}}",
@@ -120,6 +135,11 @@ esp_err_t status_handler(httpd_req_t* request) {
         humidity_json, pressure_json, environment_updated_json,
         live.power_available ? "true" : "false", bus_voltage_json,
         current_json, power_json, power_updated_json,
+        live.hopper_available ? "true" : "false", hopper_percent_json,
+        hopper_distance_json, hopper_bars_json,
+        live.hopper_available ? hopper::status_name(live.hopper)
+                              : "Unavailable",
+        hopper_updated_json,
         static_cast<unsigned long long>(live.display_refreshed_ms));
 }
 }  // namespace

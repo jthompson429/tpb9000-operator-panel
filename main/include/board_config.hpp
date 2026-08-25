@@ -24,4 +24,6 @@ inline constexpr gpio_num_t display_data_enable = GPIO_NUM_5;
 inline constexpr gpio_num_t display_pixel_clock = GPIO_NUM_7;
 inline constexpr uint8_t ch422g_mode_address = 0x24;
 inline constexpr uint8_t ch422g_output_address = 0x38;
+inline constexpr gpio_num_t rs485_rx = GPIO_NUM_43;
+inline constexpr gpio_num_t rs485_tx = GPIO_NUM_44;
 }  // namespace tpb9000::board

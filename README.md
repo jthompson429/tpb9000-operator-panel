@@ -37,8 +37,8 @@ and the firmware version are rendered over the artwork. Source PNGs and design
 iterations are retained under `design/`; `tools/png_to_rgb565.py` converts the
 production PNGs under `main/assets/` into the raw assets embedded by ESP-IDF.
 
-Support for an INA219 voltage/current/power monitor is a possible post-v1
-enhancement and is intentionally outside the completed Version 1 scope.
+The first post-v1 hardware milestone adds live INA219 voltage, current, and
+power monitoring without changing Version 1's independence guarantees.
 
 ## Post-v1 development
 
@@ -103,6 +103,38 @@ connect 12 V to INA219 `VCC`, and do not place the entire TPB9000 system load
 through this breakout. Initial hardware validation measured approximately
 12.25 V, 0.205 A, and 2.53 W with the display active.
 
+## Hopper sensor connection
+
+The A02-family hopper sensor produces raw 9600-baud TTL UART, while this
+panel's exposed serial terminal is electrically RS485. Do not connect the
+sensor TX pin directly to either RS485 terminal. The serviceable, protected
+connection uses a small 5 V MAX485-compatible transmitter beside the sensor:
+
+| A02 sensor / adapter | Connection |
+| --- | --- |
+| Sensor `VCC` | 5 V supply |
+| Sensor `GND` | Supply and adapter `GND` |
+| Sensor `TX` | Adapter `DI` |
+| Sensor `RX` / mode | Leave in the vendor-specified automatic-output state |
+| Adapter `VCC` | 5 V supply |
+| Adapter `DE` | 5 V (driver permanently enabled) |
+| Adapter `/RE` | 5 V (receiver disabled) |
+| Adapter `A` | Panel RS485 `A` |
+| Adapter `B` | Panel RS485 `B` |
+
+Confirm the actual sensor harness pin order from its connector markings before
+applying power; wire colors alone are not authoritative. If no valid frames
+arrive after wiring, disconnect power and swap only A/B. The panel's RS485
+termination switch should normally remain off for this short point-to-point
+link and can be enabled later if cable length or noise requires it.
+
+Firmware support includes frame checksum/range validation, one-second samples,
+a five-sample rolling median, five-second stale-data invalidation, configurable
+full/empty calibration constants, and six-bar hysteresis. Until the adapter and
+sensor are connected, `/api/status` intentionally reports the hopper as
+unavailable while all existing display, environment, power, and Wi-Fi behavior
+continues normally.
+
 ## Build, flash, and monitor
 
 This is a native ESP-IDF project:
@@ -133,6 +165,9 @@ main/
   board/display.cpp
   board/i2c_bus.cpp
   sensors/environment_sensor.cpp
+  sensors/power_sensor.cpp
+  sensors/hopper_sensor.cpp
+  sensors/hopper_processing.cpp
   ui/dashboard.cpp
   network/network.cpp
   include/board_config.hpp

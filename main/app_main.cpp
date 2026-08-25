@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "i2c_bus.hpp"
+#include "hopper_sensor.hpp"
 #include "network.hpp"
 #include "power_sensor.hpp"
 #include "status_api.hpp"
@@ -60,6 +61,41 @@ void power_monitor_task(void*) {
     }
 }
 
+void hopper_monitor_task(void*) {
+    esp_err_t result = tpb9000::hopper::initialize();
+    if (result != ESP_OK) {
+        ESP_LOGE(tag, "Hopper receiver initialization failed: %s",
+                 esp_err_to_name(result));
+        tpb9000::status::set_hopper_unavailable();
+        vTaskDelete(nullptr);
+        return;
+    }
+
+    bool was_available = false;
+    unsigned log_cycles = 0;
+    while (true) {
+        tpb9000::hopper::Reading reading = {};
+        result = tpb9000::hopper::read(reading);
+        if (result == ESP_OK) {
+            tpb9000::status::set_hopper(reading);
+            if (!was_available || ++log_cycles >= 10) {
+                ESP_LOGI(tag, "Hopper: %.1f cm, %.0f%%, %u bars (%s)",
+                         reading.distance_cm, reading.percent, reading.bars,
+                         tpb9000::hopper::status_name(reading));
+                log_cycles = 0;
+            }
+            was_available = true;
+        } else {
+            tpb9000::status::set_hopper_unavailable();
+            if (was_available) {
+                ESP_LOGW(tag, "Hopper sensor data lost; showing unavailable");
+            }
+            was_available = false;
+            log_cycles = 0;
+        }
+    }
+}
+
 void fatal(const char* operation, esp_err_t error) {
     ESP_LOGE(tag, "%s: %s", operation, esp_err_to_name(error));
     ESP_LOGE(tag, "Restarting in five seconds");
@@ -91,6 +127,11 @@ extern "C" void app_main() {
                     nullptr) != pdPASS) {
         ESP_LOGE(tag, "Could not start INA219 monitor; continuing without it");
         tpb9000::status::set_power_unavailable();
+    }
+    if (xTaskCreate(hopper_monitor_task, "hopper_monitor", 4096, nullptr, 5,
+                    nullptr) != pdPASS) {
+        ESP_LOGE(tag, "Could not start hopper monitor; continuing without it");
+        tpb9000::status::set_hopper_unavailable();
     }
     bool sensor_ready = false;
     unsigned sensor_retry_cycles = 0;
