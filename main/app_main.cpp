@@ -161,7 +161,8 @@ extern "C" void app_main() {
             const esp_err_t display_result =
                 tpb9000::dashboard::show_reading(
                     reading, tpb9000::network::online(),
-                    live_status.power_available, live_status.power);
+                    live_status.power_available, live_status.power,
+                    live_status.hopper_available, live_status.hopper);
             if (display_result != ESP_OK) {
                 ESP_LOGE(tag, "Dashboard update failed: %s",
                          esp_err_to_name(display_result));
@@ -180,7 +181,8 @@ extern "C" void app_main() {
             const esp_err_t display_result =
                 tpb9000::dashboard::show_sensor_error(
                     tpb9000::network::online(),
-                    live_status.power_available, live_status.power);
+                    live_status.power_available, live_status.power,
+                    live_status.hopper_available, live_status.hopper);
             if (display_result == ESP_OK) {
                 tpb9000::status::note_display_refresh();
             }

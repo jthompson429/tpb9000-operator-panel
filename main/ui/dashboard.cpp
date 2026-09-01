@@ -14,6 +14,10 @@ constexpr auto muted = display::rgb565(176, 176, 176);
 constexpr auto online = display::rgb565(34, 197, 94);
 constexpr auto error = display::rgb565(220, 65, 65);
 constexpr auto power_accent = display::rgb565(0, 209, 255);
+constexpr auto gauge_outline = display::rgb565(67, 100, 122);
+constexpr auto gauge_empty = display::rgb565(12, 20, 28);
+constexpr auto gauge_green = display::rgb565(34, 197, 94);
+constexpr auto gauge_amber = display::rgb565(245, 158, 11);
 
 extern const uint8_t background_normal_start[]
     asm("_binary_background_normal_rgb565_start");
@@ -42,6 +46,43 @@ int text_width(const char* value, int scale) {
 void draw_centered_value(int center_x, int y, const char* value, int scale) {
     display::draw_text(center_x - text_width(value, scale) / 2, y, value,
                        scale, text);
+}
+
+void draw_hopper_gauge(bool available, const hopper::Reading& reading) {
+    constexpr int gauge_x = 288;
+    constexpr int gauge_width = 17;
+    constexpr int segment_height = 20;
+    constexpr int segment_gap = 5;
+    constexpr int gauge_bottom = 322;
+
+    display::Color fill = gauge_green;
+    if (reading.bars == 1) {
+        fill = error;
+    } else if (reading.bars <= 3) {
+        fill = gauge_amber;
+    }
+
+    char percent[8] = "--";
+    if (available) {
+        std::snprintf(percent, sizeof(percent), "%.0f%%", reading.percent);
+    }
+    display::draw_text(296 - text_width(percent, 2) / 2, 128, percent, 2,
+                       available ? fill : muted);
+    display::draw_text(296 - text_width("KIBBLE", 1) / 2, 151, "KIBBLE", 1,
+                       power_accent);
+
+    for (uint8_t segment = 0; segment < 6; ++segment) {
+        const int y = gauge_bottom - segment_height -
+                      segment * (segment_height + segment_gap);
+        display::fill_rectangle(gauge_x, y, gauge_width, segment_height,
+                                gauge_outline);
+        display::fill_rectangle(gauge_x + 2, y + 2, gauge_width - 4,
+                                segment_height - 4,
+                                available && segment < reading.bars
+                                    ? fill
+                                    : gauge_empty);
+    }
+
 }
 
 void draw_footer(bool network_online,
@@ -81,7 +122,9 @@ void draw_footer(bool network_online,
 esp_err_t show_reading(const environment::Reading& reading,
                        bool network_online,
                        bool power_available,
-                       const power::Reading& power_reading) {
+                       const power::Reading& power_reading,
+                       bool hopper_available,
+                       const hopper::Reading& hopper_reading) {
     char temperature[16] = {};
     char humidity[16] = {};
     char pressure[16] = {};
@@ -94,19 +137,23 @@ esp_err_t show_reading(const environment::Reading& reading,
     draw_centered_value(388, 226, temperature, 5);
     draw_centered_value(542, 226, humidity, 5);
     draw_centered_value(691, 230, pressure, 4);
+    draw_hopper_gauge(hopper_available, hopper_reading);
     draw_footer(network_online, power_available, power_reading);
     return display::present();
 }
 
 esp_err_t show_sensor_error(bool network_online,
                             bool power_available,
-                            const power::Reading& power_reading) {
+                            const power::Reading& power_reading,
+                            bool hopper_available,
+                            const hopper::Reading& hopper_reading) {
     const esp_err_t shell_result = draw_shell(network_online);
     if (shell_result != ESP_OK) return shell_result;
     display::fill_rectangle(315, 94, 449, 316, display::rgb565(8, 12, 18));
     display::fill_rectangle(315, 94, 449, 5, error);
     display::draw_text(373, 205, "SENSOR ERROR", 6, error);
     display::draw_text(371, 282, "CHECK BME280", 3, text);
+    draw_hopper_gauge(hopper_available, hopper_reading);
     draw_footer(network_online, power_available, power_reading);
     return display::present();
 }
