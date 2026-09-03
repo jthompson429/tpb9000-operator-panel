@@ -68,8 +68,9 @@ void draw_hopper_gauge(bool available, const hopper::Reading& reading) {
     }
     display::draw_text(296 - text_width(percent, 2) / 2, 128, percent, 2,
                        available ? fill : muted);
-    display::draw_text(296 - text_width("KIBBLE", 1) / 2, 151, "KIBBLE", 1,
-                       power_accent);
+    const char* label = available ? "KIBBLE" : "OFFLINE";
+    display::draw_text(296 - text_width(label, 1) / 2, 151, label, 1,
+                       available ? power_accent : error);
 
     for (uint8_t segment = 0; segment < 6; ++segment) {
         const int y = gauge_bottom - segment_height -

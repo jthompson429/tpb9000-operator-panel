@@ -103,37 +103,21 @@ connect 12 V to INA219 `VCC`, and do not place the entire TPB9000 system load
 through this breakout. Initial hardware validation measured approximately
 12.25 V, 0.205 A, and 2.53 W with the display active.
 
-## Hopper sensor connection
+## Wireless hopper sensor
 
-The A02-family hopper sensor produces raw 9600-baud TTL UART, while this
-panel's exposed serial terminal is electrically RS485. Do not connect the
-sensor TX pin directly to either RS485 terminal. The serviceable, protected
-connection uses a small 5 V MAX485-compatible transmitter beside the sensor:
+The temporary A02-to-MAX485 wired link proved the sensor, calibration, fill
+calculation, and dashboard treatment. The production architecture replaces
+that removable-hopper cable with a USB-powered ESP32-S3 SuperMini development
+node and ESP-NOW. The node validates the sensor's 9600-baud UART frames and
+sends distance; the panel retains the five-sample median, calibration,
+percentage, six-bar hysteresis, display, and API reporting.
 
-| A02 sensor / adapter | Connection |
-| --- | --- |
-| Sensor `VCC` | 5 V supply |
-| Sensor `GND` | Supply and adapter `GND` |
-| Sensor `TX` | Adapter `DI` |
-| Sensor `RX` / mode | Leave in the vendor-specified automatic-output state |
-| Adapter `VCC` | 5 V supply |
-| Adapter `DE` | 5 V (driver permanently enabled) |
-| Adapter `/RE` | 5 V (receiver disabled) |
-| Adapter `A` | Panel RS485 `A` |
-| Adapter `B` | Panel RS485 `B` |
-
-Confirm the actual sensor harness pin order from its connector markings before
-applying power; wire colors alone are not authoritative. If no valid frames
-arrive after wiring, disconnect power and swap only A/B. The panel's RS485
-termination switch should normally remain off for this short point-to-point
-link and can be enabled later if cable length or noise requires it.
-
-Firmware support includes frame checksum/range validation, one-second samples,
-a five-sample rolling median, five-second stale-data invalidation, configurable
-full/empty calibration constants, and six-bar hysteresis. Until the adapter and
-sensor are connected, `/api/status` intentionally reports the hopper as
-unavailable while all existing display, environment, power, and Wi-Fi behavior
-continues normally.
+The two firmwares build independently from this repository. See the
+[wireless hopper guide](docs/wireless-hopper.md) for safe wiring, MAC/channel
+commissioning, build/flash commands, bench tests, limitations, and a walkthrough
+of the actual ESP-NOW data path. Battery, solar, deep sleep, and sensor power
+switching are deliberately deferred until the continuously powered wireless
+link is proven.
 
 ## Build, flash, and monitor
 
@@ -166,10 +150,10 @@ main/
   board/i2c_bus.cpp
   sensors/environment_sensor.cpp
   sensors/power_sensor.cpp
-  sensors/hopper_sensor.cpp
   sensors/hopper_processing.cpp
   ui/dashboard.cpp
   network/network.cpp
+  network/hopper_receiver.cpp
   include/board_config.hpp
   include/display.hpp
   include/i2c_bus.hpp
@@ -178,6 +162,8 @@ main/
   include/network.hpp
   include/private_config.example.h
   vendor/bme280/ (Bosch BME280 SensorAPI)
+components/hopper_protocol/ (shared 16-byte ESP-NOW wire contract)
+hopper-node/ (independently buildable ESP32-S3 SuperMini firmware)
 design/ (source artwork and dashboard iterations)
 tools/png_to_rgb565.py
 partitions.csv

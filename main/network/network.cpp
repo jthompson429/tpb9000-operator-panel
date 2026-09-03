@@ -67,8 +67,10 @@ esp_err_t configure_static_ipv4(esp_netif_t* interface) {
 void handle_event(void*, esp_event_base_t event_base, int32_t event_id,
                   void* event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        ESP_LOGI(tag, "Wi-Fi station started; connecting");
-        esp_wifi_connect();
+        if (configured()) {
+            ESP_LOGI(tag, "Wi-Fi station started; connecting");
+            esp_wifi_connect();
+        }
     } else if (event_base == WIFI_EVENT &&
                event_id == WIFI_EVENT_STA_DISCONNECTED) {
         has_ip.store(false);
@@ -81,6 +83,15 @@ void handle_event(void*, esp_event_base_t event_base, int32_t event_id,
         has_ip.store(true);
         ESP_LOGI(tag, "Network online: " IPSTR,
                  IP2STR(&event->ip_info.ip));
+        uint8_t primary_channel = 0;
+        wifi_second_chan_t secondary_channel = WIFI_SECOND_CHAN_NONE;
+        if (esp_wifi_get_channel(&primary_channel, &secondary_channel) ==
+            ESP_OK) {
+            ESP_LOGI(tag,
+                     "Wi-Fi/ESP-NOW operating channel: %u (configure the "
+                     "hopper node to match)",
+                     primary_channel);
+        }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_LOST_IP) {
         has_ip.store(false);
         ESP_LOGW(tag, "Network offline (IP address lost)");
@@ -101,11 +112,6 @@ bool rssi_dbm(int8_t& value) {
 }
 
 esp_err_t initialize() {
-    if (!configured()) {
-        ESP_LOGW(tag, "Wi-Fi credentials are not configured; remaining offline");
-        return ESP_OK;
-    }
-
     esp_err_t result = nvs_flash_init();
     if (result == ESP_ERR_NVS_NO_FREE_PAGES ||
         result == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -121,7 +127,10 @@ esp_err_t initialize() {
     if ((result = esp_netif_set_hostname(interface, "tpb9000-panel")) != ESP_OK) {
         return result;
     }
-    if ((result = configure_static_ipv4(interface)) != ESP_OK) return result;
+    if (configured() &&
+        (result = configure_static_ipv4(interface)) != ESP_OK) {
+        return result;
+    }
 
     wifi_init_config_t initialization = WIFI_INIT_CONFIG_DEFAULT();
     if ((result = esp_wifi_init(&initialization)) != ESP_OK) return result;
@@ -150,21 +159,31 @@ esp_err_t initialize() {
     }
 
     wifi_config_t configuration = {};
-    std::strncpy(reinterpret_cast<char*>(configuration.sta.ssid),
-                 TPB9000_WIFI_SSID, sizeof(configuration.sta.ssid) - 1);
-    std::strncpy(reinterpret_cast<char*>(configuration.sta.password),
-                 TPB9000_WIFI_PASSWORD, sizeof(configuration.sta.password) - 1);
-    configuration.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-    configuration.sta.pmf_cfg.capable = true;
-    configuration.sta.pmf_cfg.required = false;
+    if (configured()) {
+        std::strncpy(reinterpret_cast<char*>(configuration.sta.ssid),
+                     TPB9000_WIFI_SSID, sizeof(configuration.sta.ssid) - 1);
+        std::strncpy(reinterpret_cast<char*>(configuration.sta.password),
+                     TPB9000_WIFI_PASSWORD,
+                     sizeof(configuration.sta.password) - 1);
+        configuration.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+        configuration.sta.pmf_cfg.capable = true;
+        configuration.sta.pmf_cfg.required = false;
+    }
 
     if ((result = esp_wifi_set_storage(WIFI_STORAGE_RAM)) != ESP_OK) return result;
     if ((result = esp_wifi_set_mode(WIFI_MODE_STA)) != ESP_OK) return result;
-    if ((result = esp_wifi_set_config(WIFI_IF_STA, &configuration)) != ESP_OK) {
+    if (configured() &&
+        (result = esp_wifi_set_config(WIFI_IF_STA, &configuration)) != ESP_OK) {
         return result;
     }
     if ((result = esp_wifi_set_ps(WIFI_PS_NONE)) != ESP_OK) return result;
-    ESP_LOGI(tag, "Connecting to configured Wi-Fi network");
+    if (configured()) {
+        ESP_LOGI(tag, "Connecting to configured Wi-Fi network");
+    } else {
+        ESP_LOGW(tag,
+                 "Wi-Fi credentials are not configured; station radio will "
+                 "remain available for ESP-NOW");
+    }
     return esp_wifi_start();
 }
 

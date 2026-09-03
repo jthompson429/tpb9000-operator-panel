@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "i2c_bus.hpp"
+#include "hopper_receiver.hpp"
 #include "hopper_sensor.hpp"
 #include "network.hpp"
 #include "power_sensor.hpp"
@@ -62,21 +63,28 @@ void power_monitor_task(void*) {
 }
 
 void hopper_monitor_task(void*) {
-    esp_err_t result = tpb9000::hopper::initialize();
+    esp_err_t result = tpb9000::hopper_radio::initialize();
     if (result != ESP_OK) {
-        ESP_LOGE(tag, "Hopper receiver initialization failed: %s",
+        ESP_LOGE(tag, "Wireless hopper receiver initialization failed: %s",
                  esp_err_to_name(result));
         tpb9000::status::set_hopper_unavailable();
         vTaskDelete(nullptr);
         return;
     }
 
+    tpb9000::hopper::Processor processor;
     bool was_available = false;
     unsigned log_cycles = 0;
     while (true) {
+        tpb9000::hopper_radio::Sample sample = {};
         tpb9000::hopper::Reading reading = {};
-        result = tpb9000::hopper::read(reading);
-        if (result == ESP_OK) {
+        result = tpb9000::hopper_radio::receive(sample, 5000);
+        const bool sensor_ok =
+            result == ESP_OK &&
+            sample.sensor_status ==
+                tpb9000::hopper_protocol::SensorStatus::ok &&
+            processor.push(sample.distance_mm, reading);
+        if (sensor_ok) {
             tpb9000::status::set_hopper(reading);
             if (!was_available || ++log_cycles >= 10) {
                 ESP_LOGI(tag, "Hopper: %.1f cm, %.0f%%, %u bars (%s)",
@@ -88,8 +96,10 @@ void hopper_monitor_task(void*) {
         } else {
             tpb9000::status::set_hopper_unavailable();
             if (was_available) {
-                ESP_LOGW(tag, "Hopper sensor data lost; showing unavailable");
+                ESP_LOGW(tag,
+                         "Wireless hopper data stale/invalid; showing OFFLINE");
             }
+            processor.reset();
             was_available = false;
             log_cycles = 0;
         }
@@ -107,7 +117,7 @@ void fatal(const char* operation, esp_err_t error) {
 extern "C" void app_main() {
     ESP_LOGI(tag, "TPB9000 Operator Panel");
     ESP_LOGI(tag, "Board: %s", tpb9000::board::model);
-    ESP_LOGI(tag, "Milestone: live BME280 measurements");
+    ESP_LOGI(tag, "Milestone: wireless hopper telemetry");
     esp_err_t result = tpb9000::i2c::initialize();
     if (result != ESP_OK) fatal("I2C initialization failed", result);
     tpb9000::i2c::scan_and_log();
